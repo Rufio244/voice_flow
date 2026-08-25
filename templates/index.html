@@ -1,1 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Flow - ระบบวิเคราะห์และสรุปเสียงอัจฉริยะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased">
+    <div class="max-w-4xl mx-auto p-6 md:p-10">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-black text-indigo-600 mb-2">🎙️ Voice Flow</h1>
+            <p class="text-slate-500">ระบบบันทึก วิเคราะห์ สรุปเสียง ถาม-ตอบ และสร้างเอกสารอัตโนมัติ</p>
+        </header>
 
+        <!-- ส่วนที่ 1: อัปโหลดและบันทึกเสียง -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
+            <h2 class="text-lg font-bold mb-4 text-slate-700">1. นำเข้าไฟล์เสียง หรือ บันทึกเสียงสด</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center flex flex-col justify-center items-center">
+                    <input type="file" id="audioFile" accept="audio/*" class="mb-3 text-sm text-slate-500 w-full">
+                    <button onclick="uploadAudio()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition shadow-sm w-full">อัปโหลดและวิเคราะห์</button>
+                </div>
+                <div class="border-2 border-slate-200 rounded-xl p-6 text-center flex flex-col justify-center items-center bg-slate-50">
+                    <button id="recordBtn" onclick="toggleRecord()" class="bg-rose-500 text-white w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl hover:bg-rose-600 transition shadow-md mb-2">🔴</button>
+                    <span id="recordStatus" class="text-sm text-slate-500">คลิกเพื่อเริ่มบันทึกเสียง</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ส่วนที่ 2: ผลการวิเคราะห์และสรุป -->
+        <div id="resultSection" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-700">2. ผลการวิเคราะห์และสรุปเนื้อหา</h2>
+                <span class="text-xs font-bold uppercase bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full" id="categoryBadge">-</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <h3 class="font-bold text-sm text-slate-600 mb-2">ข้อความถอดเสียง (Transcript):</h3>
+                    <p id="transcriptText" class="text-sm text-slate-700 whitespace-pre-line leading-relaxed">-</p>
+                </div>
+                <div class="bg-indigo-50/40 p-4 rounded-xl border border-indigo-100">
+                    <h3 class="font-bold text-sm text-indigo-800 mb-2">สรุปสาระสำคัญทั้งหมด:</h3>
+                    <p id="summaryText" class="text-sm text-slate-700 whitespace-pre-line leading-relaxed">-</p>
+                </div>
+            </div>
+            <button onclick="exportDoc('txt')" class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-emerald-700 transition shadow-sm">📥 ดาวน์โหลดเอกสารสรุป (.txt)</button>
+        </div>
+
+        <!-- ส่วนที่ 3: ระบบถาม-ตอบ -->
+        <div id="qaSection" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hidden">
+            <h2 class="text-lg font-bold mb-4 text-slate-700">3. ถาม-ตอบเชิงลึกจากเนื้อหาเสียง</h2>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="questionInput" placeholder="พิมพ์คำถามของคุณ เช่น สรุปประเด็นหลักคืออะไร..." class="flex-1 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                <button onclick="askQuestion()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-slate-800 transition shadow-sm">ถาม AI</button>
+            </div>
+            <div id="qaAnswerBox" class="bg-slate-50 p-4 rounded-xl text-sm text-slate-700 border border-slate-200 hidden leading-relaxed"></div>
+        </div>
+    </div>
+
+    <script>
+        let globalTranscript = "";
+        let globalSummary = "";
+
+        async function uploadAudio() {
+            const fileInput = document.getElementById('audioFile');
+            if (fileInput.files.length === 0) {
+                alert('กรุณาเลือกไฟล์เสียงก่อนอัปโหลดครับ');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const res = await fetch('/api/process-audio', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            globalTranscript = data.transcript;
+            globalSummary = data.summary;
+
+            document.getElementById('categoryBadge').innerText = data.category;
+            document.getElementById('transcriptText').innerText = data.transcript;
+            document.getElementById('summaryText').innerText = data.summary;
+
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('qaSection').classList.remove('hidden');
+        }
+
+        async function askQuestion() {
+            const question = document.getElementById('questionInput').value;
+            if (!question) return;
+
+            const res = await fetch('/api/ask-content', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: question, transcript: globalTranscript })
+            });
+            const data = await res.json();
+
+            const ansBox = document.getElementById('qaAnswerBox');
+            ansBox.innerText = data.answer;
+            ansBox.classList.remove('hidden');
+        }
+
+        async function exportDoc(type) {
+            const res = await fetch('/api/export-document', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: type, content: globalTranscript, summary: globalSummary })
+            });
+            const data = await res.json();
+            window.location.href = data.download_url;
+        }
+
+        let isRecording = false;
+        function toggleRecord() {
+            isRecording = !isRecording;
+            const btn = document.getElementById('recordBtn');
+            const status = document.getElementById('recordStatus');
+            if (isRecording) {
+                btn.classList.add('animate-pulse');
+                status.innerText = "กำลังบันทึกเสียงสด...";
+            } else {
+                btn.classList.remove('animate-pulse');
+                status.innerText = "บันทึกเสียงเสร็จสิ้น!";
+                alert("จำลองการบันทึกเสียงเรียบร้อยแล้ว คุณสามารถกดอัปโหลดหรือทดสอบระบบได้เลยครับ");
+            }
+        }
+    </script>
+</body>
+</html>
